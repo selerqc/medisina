@@ -1,0 +1,11 @@
+node_modules
+.env
+.env._
+.git
+.gitignore
+README.md
+_.md
+uploads/
+src/logger/logs/
+\*.log
+.DS_Store
