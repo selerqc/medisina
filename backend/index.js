@@ -46,9 +46,9 @@ const startServer = async () => {
 
     // await cache.connect();
 
-    server = app.listen(config.PORT, config.HOST, () => {
+    server = app.listen(config.PORT, () => {
 
-      logger.info(`Server is running on http://${config.HOST}:${config.PORT}/api/v1`);
+      logger.info(`Server is running on port ${config.PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
     });
 

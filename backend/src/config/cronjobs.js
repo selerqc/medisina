@@ -2,7 +2,7 @@ import cron from 'node-cron';
 import logger from '#logger/logger.js';
 import Notification from '#modules/notifications/notification.model.js';
 import AuditTrailModel from '#modules/audit-trail/audit-trail.model.js';
-
+import fetch from "node-fetch";
 
 const deleteOldNotifications = async () => {
   try {
@@ -34,6 +34,21 @@ const deleteOldAuditTrails = async () => {
   }
 };
 
+export const ping = () => {
+
+
+  const URL = "https://medisina-1aja.onrender.com/";
+
+  cron.schedule("*/5 * * * *", async () => {
+    try {
+      await fetch(URL);
+      logger.info("Pinged self to stay awake");
+    } catch (err) {
+      logger.error("Ping failed");
+    }
+  });
+
+}
 
 export const initializeCronJobs = () => {
 
@@ -45,12 +60,13 @@ export const initializeCronJobs = () => {
     scheduled: true,
     timezone: "Asia/Manila"
   });
-
+  ping()
   logger.info('Cron jobs initialized: Daily cleanup of notifications and audit trails at 2:00 AM');
 };
 
 export default {
   initializeCronJobs,
   deleteOldNotifications,
-  deleteOldAuditTrails
+  deleteOldAuditTrails,
+  ping
 };
