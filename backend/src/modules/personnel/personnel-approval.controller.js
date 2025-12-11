@@ -24,7 +24,6 @@ export const getApprovedRecords = asyncHandler(async (req, res) => {
   const limit = parseInt(req.query.limit) || 100;
   const auditInfo = extractAuditInfo(req.user);
 
-  logger.info(`Fetching approved personnel records - Page: ${page}, Limit: ${limit}`, auditInfo);
 
   const approvedRecords = await personnelService.getApprovedHealthRecords(page, limit);
 

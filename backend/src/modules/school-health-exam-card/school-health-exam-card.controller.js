@@ -870,7 +870,6 @@ export const exportHealthRecord = asyncHandler(async (req, res) => {
 
   const templatePath = getTemplatePath('SCHOOL HEALTH EXAMINATION CARD.xlsx');
 
-  // Check if file exists before trying to read it
   if (!fs.existsSync(templatePath)) {
     logger.error(`Template file not found at path: ${templatePath}`);
     logger.error(`Current working directory: ${process.cwd()}`);
@@ -887,7 +886,6 @@ export const exportHealthRecord = asyncHandler(async (req, res) => {
 
   const sheet = workbook.getWorksheet(1);
 
-  // Fill in student header information
   sheet.getCell('B8').value = ` ${student.lastName || ''} ${student.firstName || ''} ${student.middleName || ''}`;
   sheet.getCell('Q8').value = ` ${student.schoolId || ''}`;
 

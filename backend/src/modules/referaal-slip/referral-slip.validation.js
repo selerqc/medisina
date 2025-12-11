@@ -43,6 +43,7 @@ const returnSlipSchema = Joi.object({
     'date.max': 'Date cannot be in the future'
   }),
   signatureName: Joi.string().trim().allow('').optional(),
+  signatureString: Joi.string().allow('').optional(),
   designation: Joi.string().trim().allow('').optional()
 }).optional();
 

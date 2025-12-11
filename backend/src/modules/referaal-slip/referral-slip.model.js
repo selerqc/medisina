@@ -34,6 +34,7 @@ const ReferralSlipSchema = new mongoose.Schema({
     date: { type: Date, required: false },
     signatureName: { type: String, required: false },
     designation: { type: String, required: false },
+    signatureString: { type: String, required: false }
   },
 
   createdAt: { type: Date, default: Date.now },

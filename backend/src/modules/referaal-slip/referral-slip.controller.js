@@ -5,6 +5,7 @@ import ApiError from "#utils/ApiError.js";
 import { extractAuditInfo, getTemplatePath } from "#utils/helpers.js";
 import ExcelJS from 'exceljs';
 import path from 'path';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 export const createReferralSlip = asyncHandler(async (req, res) => {
   const auditInfo = extractAuditInfo(req.user);
@@ -194,117 +195,196 @@ export const exportReferralSlipToExcel = asyncHandler(async (req, res) => {
     throw new ApiError('Referral Slip not found', StatusCodes.NOT_FOUND);
   }
 
-  const workbook = new ExcelJS.Workbook();
-  const templatePath = getTemplatePath('Referral Slip.xlsx');
+  const { referralSlip, returnSlip } = record;
 
-  try {
-    await workbook.xlsx.readFile(templatePath);
-  } catch (err) {
-    throw new ApiError(`Template file not found: ${templatePath}`, StatusCodes.INTERNAL_SERVER_ERROR);
-  }
+  // Create a new PDF document
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([612, 792]); // Letter size (8.5" x 11")
 
-  const worksheet = workbook.worksheets[0];
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const { width, height } = page.getSize();
 
-  if (!worksheet) {
-    throw new ApiError('Invalid template format', StatusCodes.INTERNAL_SERVER_ERROR);
-  }
-
-  const { referralSlip } = record;
-
-  // Helper function to safely set cell value
-  const setCellValue = (cellAddress, value) => {
-    try {
-      if (value !== null && value !== undefined && value !== '') {
-        const cell = worksheet.getCell(cellAddress);
-        cell.value = value;
-      }
-    } catch (error) {
-      console.error(`Error setting cell ${cellAddress}:`, error.message);
-    }
+  // Helper function to draw text
+  const drawText = (text, x, y, options = {}) => {
+    page.drawText(text || '', {
+      x,
+      y: height - y,
+      size: options.size || 10,
+      font: options.bold ? fontBold : font,
+      color: rgb(0, 0, 0),
+      ...options
+    });
   };
 
-  setCellValue('B9', referralSlip.to && referralSlip.agency ? `${referralSlip.to} ${referralSlip.agency}` : referralSlip.to || referralSlip.agency);
-  setCellValue('L9', referralSlip.date ? new Date(referralSlip.date).toLocaleDateString() : '');
-  setCellValue('D11', referralSlip.address);
-  setCellValue('D15', referralSlip.name);
-  setCellValue('M15', referralSlip.age);
-  setCellValue('O15', referralSlip.sex);
-  setCellValue('F16', referralSlip.addressOrSchool);
-  setCellValue('M16', referralSlip.grade);
-  setCellValue('A18', referralSlip.chiefComplaint);
-  setCellValue('E20', referralSlip.impression);
-  setCellValue('E21', referralSlip.remarks);
-  setCellValue('M22', referralSlip.referrerName);
-  setCellValue('M24', referralSlip.referrerDesignation);
-  // setCellValue('N22', referralSlip.signatureString);
+  // Helper function to draw line
+  const drawLine = (x1, y1, x2, y2) => {
+    page.drawLine({
+      start: { x: x1, y: height - y1 },
+      end: { x: x2, y: height - y2 },
+      thickness: 1,
+      color: rgb(0, 0, 0)
+    });
+  };
 
+  // Header
+  drawText('Republic of the Philippines', width / 2 - 80, 40, { bold: true, size: 11 });
+  drawText('Department of Education', width / 2 - 70, 55, { size: 10 });
+  drawText('Region ___________________', width / 2 - 70, 70, { size: 10 });
+  drawText('Division of ___________________', width / 2 - 80, 85, { size: 10 });
 
-  const { returnSlip } = record;
+  // Title
+  drawText('REFERRAL SLIP', width / 2 - 50, 120, { bold: true, size: 14 });
+
+  // Referral Slip Section
+  let yPos = 160;
+
+  // To and Date
+  drawText('To', 50, yPos, { size: 10 });
+  const toText = referralSlip.to && referralSlip.agency
+    ? `${referralSlip.to} ${referralSlip.agency}`
+    : referralSlip.to || referralSlip.agency || '';
+  drawText(toText, 100, yPos, { size: 10 });
+  drawLine(90, yPos + 5, 400, yPos + 5);
+
+  drawText('Date', 450, yPos, { size: 10 });
+  const dateText = referralSlip.date ? new Date(referralSlip.date).toLocaleDateString() : '';
+  drawText(dateText, 485, yPos, { size: 10 });
+  drawLine(480, yPos + 5, 560, yPos + 5);
+
+  yPos += 20;
+  drawText('(Agency)', width / 2 - 20, yPos, { size: 9 });
+
+  // Address
+  yPos += 30;
+  drawText('Address', 50, yPos, { size: 10 });
+  drawText(referralSlip.address || '', 100, yPos, { size: 10 });
+  drawLine(90, yPos + 5, 560, yPos + 5);
+
+  // This is to refer to you:
+  yPos += 30;
+  drawText('This is to refer to you:', 80, yPos, { size: 10 });
+
+  // Name, Age, Sex
+  yPos += 30;
+  drawText('Name:', 50, yPos, { size: 10 });
+  drawText(referralSlip.name || '', 90, yPos, { size: 10 });
+  drawLine(85, yPos + 5, 380, yPos + 5);
+
+  drawText('Age:', 390, yPos, { size: 10 });
+  drawText(referralSlip.age?.toString() || '', 415, yPos, { size: 10 });
+  drawLine(410, yPos + 5, 460, yPos + 5);
+
+  drawText('Sex:', 470, yPos, { size: 10 });
+  drawText(referralSlip.sex || '', 495, yPos, { size: 10 });
+  drawLine(490, yPos + 5, 560, yPos + 5);
+
+  // Address/School and Grade
+  yPos += 20;
+  drawText('Address/School:', 50, yPos, { size: 10 });
+  drawText(referralSlip.addressOrSchool || '', 130, yPos, { size: 10 });
+  drawLine(125, yPos + 5, 380, yPos + 5);
+
+  drawText('Grade:', 390, yPos, { size: 10 });
+  drawText(referralSlip.grade || '', 425, yPos, { size: 10 });
+  drawLine(420, yPos + 5, 560, yPos + 5);
+
+  // Chief Complaint
+  yPos += 25;
+  drawText('Chief Complaint:', 50, yPos, { size: 10 });
+  drawText(referralSlip.chiefComplaint || '', 50, yPos + 15, { size: 10 });
+  drawLine(50, yPos + 20, 560, yPos + 20);
+
+  // Impression
+  yPos += 45;
+  drawText('Impression:', 50, yPos, { size: 10 });
+  drawText(referralSlip.impression || '', 115, yPos, { size: 10 });
+  drawLine(110, yPos + 5, 560, yPos + 5);
+
+  // Remarks
+  yPos += 15;
+  drawText('Remarks:', 50, yPos, { size: 10 });
+  drawText(referralSlip.remarks || '', 115, yPos, { size: 10 });
+  drawLine(110, yPos + 5, 560, yPos + 5);
+
+  // Name and Signature
+  yPos += 30;
+  drawText(referralSlip.referrerName || '', 400, yPos, { size: 10 });
+  drawLine(380, yPos + 5, 560, yPos + 5);
+  drawText('Name and Signature', 420, yPos + 12, { size: 8 });
+
+  drawText('Doctor', 450, yPos + 25, { size: 8 });
+
+  // Designation
+  yPos += 25;
+  drawText(referralSlip.referrerDesignation || '', 400, yPos, { size: 10 });
+  drawLine(380, yPos + 5, 560, yPos + 5);
+  drawText('Designation', 440, yPos + 12, { size: 8 });
+
+  // Separator
+  yPos += 35;
+  drawLine(50, yPos, 560, yPos);
+  drawText('Note: To be detached from upper portion and sent back to the school.', 50, yPos + 15, { size: 8 });
+
+  // Return Slip Section
+  yPos += 40;
+  drawText('Return Slip', width / 2 - 40, yPos, { bold: true, size: 12 });
 
   if (returnSlip) {
-    setCellValue('E31', returnSlip.returnedTo);
-    setCellValue('F32', returnSlip.nameOfPatient);
-    setCellValue('M32', returnSlip.dateReferred ? new Date(returnSlip.dateReferred).toLocaleDateString() : '');
-    setCellValue('F33', returnSlip.chiefComplaint);
-    setCellValue('E34', returnSlip.findings);
-    setCellValue('G35', returnSlip.actionOrRecommendations);
-    setCellValue('M39', returnSlip.signatureName);
-    setCellValue('M41', returnSlip.designation);
+    yPos += 30;
+    drawText('Returned to', 50, yPos, { size: 10 });
+    drawText(returnSlip.returnedTo || '', 120, yPos, { size: 10 });
+    drawLine(115, yPos + 5, 560, yPos + 5);
+
+    yPos += 20;
+    drawText('Name of Patient', 50, yPos, { size: 10 });
+    drawText(returnSlip.nameOfPatient || '', 140, yPos, { size: 10 });
+    drawLine(135, yPos + 5, 380, yPos + 5);
+
+    drawText('Date Referred', 390, yPos, { size: 10 });
+    const returnDate = returnSlip.dateReferred ? new Date(returnSlip.dateReferred).toLocaleDateString() : '';
+    drawText(returnDate, 465, yPos, { size: 10 });
+    drawLine(460, yPos + 5, 560, yPos + 5);
+
+    yPos += 20;
+    drawText('Chief Complaint', 50, yPos, { size: 10 });
+    drawText(returnSlip.chiefComplaint || '', 140, yPos, { size: 10 });
+    drawLine(135, yPos + 5, 560, yPos + 5);
+
+    yPos += 20;
+    drawText('Findings', 50, yPos, { size: 10 });
+    drawText(returnSlip.findings || '', 115, yPos, { size: 10 });
+    drawLine(110, yPos + 5, 560, yPos + 5);
+
+    yPos += 20;
+    drawText('Action/Recommendations', 50, yPos, { size: 10 });
+    drawText(returnSlip.actionOrRecommendations || '', 185, yPos, { size: 10 });
+    drawLine(180, yPos + 5, 560, yPos + 5);
+
+    // Bottom signatures
+    yPos += 50;
+    drawText(dateText, 50, yPos, { size: 10 });
+    drawLine(50, yPos + 5, 150, yPos + 5);
+    drawText('Date', 90, yPos + 12, { size: 8 });
+
+    drawText(returnSlip.signatureName || '', 400, yPos, { size: 10 });
+    drawLine(380, yPos + 5, 560, yPos + 5);
+    drawText('Name & Signature', 430, yPos + 12, { size: 8 });
+
+    yPos += 25;
+    drawText(returnSlip.designation || '', 400, yPos, { size: 10 });
+    drawLine(380, yPos + 5, 560, yPos + 5);
+    drawText('Designation', 440, yPos + 12, { size: 8 });
   }
-  setCellValue('B39', referralSlip.date ? new Date(referralSlip.date).toLocaleDateString() : '');
-  if (referralSlip.signatureString) {
-    try {
-      const base64Data = referralSlip.signatureString.replace(/^data:image\/\w+;base64,/, '');
 
-      const imageId = workbook.addImage({
-        base64: base64Data,
-        extension: 'png', 
-      });
+  const pdfBytes = await pdfDoc.save();
 
+  const fileName = `Referral_Slip_${rsId}_${Date.now()}.pdf`;
 
-      worksheet.addImage(imageId, {
-        tl: { col: 12, row: 20 },
-        ext: { width: 150, height: 50 },
-      });
-    } catch (error) {
-      console.error('Error adding signature image:', error.message);
-    }
-  }
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+  res.setHeader('Content-Length', pdfBytes.length);
 
-  // Add return slip signature image if exists
-  // if (returnSlip && returnSlip.signatureName) {
-  //   try {
-  //     // If signatureName contains base64 data
-  //     if (returnSlip.signatureName.startsWith('data:image')) {
-  //       const base64Data = returnSlip.signatureName.replace(/^data:image\/\w+;base64,/, '');
-
-  //       const imageId = workbook.addImage({
-  //         base64: base64Data,
-  //         extension: 'png',
-  //       });
-
-  //       worksheet.addImage(imageId, {
-  //         tl: { col: 2, row: 37 }, // Column C, Row 38
-  //         ext: { width: 150, height: 50 },
-  //       });
-  //     }
-  //   } catch (error) {
-  //     console.error('Error adding return slip signature image:', error.message);
-  //   }
-  // }
-
-  // Generate file
-  const buffer = await workbook.xlsx.writeBuffer();
-
-  const fileName = `Referral_Slip_${rsId}_${Date.now()}.xlsx`;
-
-  res.setHeader(
-    'Content-Type',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  );
-  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-  res.setHeader('Content-Length', buffer.length);
-
-  return res.send(buffer);
+  return res.send(Buffer.from(pdfBytes));
 });
 
