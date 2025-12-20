@@ -1,7 +1,7 @@
-import NodeCache from '@cacheable/node-cache';
+import redisClient from '#config/redis.js';
 import logger from '#logger/logger.js';
 
-class MemoryCache {
+class RedisCache {
   constructor() {
     this.client = null;
     this.isConnected = false;
@@ -10,143 +10,111 @@ class MemoryCache {
 
   async connect() {
     try {
-      if (this.client && this.isConnected) {
-        logger.info('Cache client already connected');
+      if (this.isConnected) {
         return true;
       }
 
-      this.client = new NodeCache({
-        stdTTL: this.defaultTTL,
-        checkperiod: 600,
-        useClones: false,
-        deleteOnExpire: true,
-        enableLegacyCallbacks: false,
-        maxKeys: -1
-      });
+      await redisClient.connect();
+      this.client = redisClient.getClient();
+      this.isConnected = redisClient.getConnectionStatus();
 
-      this.client.on('set', (key, value) => {
-        logger.info(`Key ${key} has been set with value ${value}`);
-      });
-
-      this.client.on('del', (key, value) => {
-        logger.info(`Key ${key} has been deleted`);
-      });
-
-      this.client.on('expired', (key, value) => {
-        logger.info(`Key ${key} has expired`);
-      });
-
-      this.client.on('flush', () => {
-        logger.info('Cache has been flushed');
-      });
-
-      this.isConnected = true;
-
-      logger.info('cache client initialized successfully');
+      logger.info('Cache layer initialized with Redis');
       return true;
     } catch (error) {
-      logger.error('Failed to initialize cache:', error);
+      logger.error('Failed to initialize cache layer:', error.message);
       this.isConnected = false;
-      throw error;
+      return false;
     }
   }
 
   async set(key, value, ttl = this.defaultTTL) {
-    if (!this.isConnected) return false;
+    if (!this.isConnected || !this.client) return false;
     try {
-      await this.client.set(key, value, ttl);
+      const serialized = JSON.stringify(value);
+      await this.client.setEx(key, ttl, serialized);
       return true;
     } catch (error) {
-      logger.error(`Cache SET error for key ${key}:`, error);
+      logger.error(`Cache SET error for key ${key}:`, error.message);
       return false;
     }
   }
 
   async get(key) {
-    if (!this.isConnected) return null;
+    if (!this.isConnected || !this.client) return null;
     try {
       const data = await this.client.get(key);
-      return data !== undefined ? data : null;
+      return data ? JSON.parse(data) : null;
     } catch (error) {
-      logger.error(`Cache GET error for key ${key}:`, error);
+      logger.error(`Cache GET error for key ${key}:`, error.message);
       return null;
     }
   }
 
   async del(key) {
-    if (!this.isConnected) return false;
+    if (!this.isConnected || !this.client) return false;
     try {
-      await this.client.delete(key);
+      await this.client.del(key);
       return true;
     } catch (error) {
-      logger.error(`Cache DEL error for key ${key}:`, error);
+      logger.error(`Cache DEL error for key ${key}:`, error.message);
       return false;
     }
   }
 
   async delPattern(pattern) {
-    if (!this.isConnected) return false;
+    if (!this.isConnected || !this.client) return false;
     try {
-
-      const regexPattern = pattern.replace(/\*/g, '.*').replace(/\?/g, '.');
-      const regex = new RegExp(`^${regexPattern}$`);
-
-      const keys = await this.client.keys();
-      const matchingKeys = keys.filter(key => regex.test(key));
-
-      if (matchingKeys.length > 0) {
-        await this.client.del(matchingKeys);
+      const keys = await this.client.keys(pattern);
+      if (keys.length > 0) {
+        await this.client.del(keys);
+        logger.info(`Deleted ${keys.length} keys matching pattern: ${pattern}`);
       }
       return true;
     } catch (error) {
-      logger.error(`Cache DEL pattern error for pattern ${pattern}:`, error);
+      logger.error(`Cache DEL pattern error for pattern ${pattern}:`, error.message);
       return false;
     }
   }
 
   async exists(key) {
-    if (!this.isConnected) return false;
+    if (!this.isConnected || !this.client) return false;
     try {
-      const result = await this.client.has(key);
-      return result;
+      const result = await this.client.exists(key);
+      return result === 1;
     } catch (error) {
-      logger.error(`Cache EXISTS error for key ${key}:`, error);
+      logger.error(`Cache EXISTS error for key ${key}:`, error.message);
       return false;
     }
   }
 
   async flushAll() {
-    if (!this.isConnected) return false;
+    if (!this.isConnected || !this.client) return false;
     try {
-      await this.client.clear();
+      await this.client.flushDb();
+      logger.info('Cache flushed');
       return true;
     } catch (error) {
-      logger.error('Cache FLUSHALL error:', error);
+      logger.error('Cache FLUSHALL error:', error.message);
       return false;
     }
   }
 
   async ttl(key) {
-    if (!this.isConnected) return -1;
+    if (!this.isConnected || !this.client) return -1;
     try {
       const ttl = await this.client.ttl(key);
-      return ttl === 0 ? -1 : Math.floor(ttl / 1000);
+      return ttl;
     } catch (error) {
-      logger.error(`Cache TTL error for key ${key}:`, error);
+      logger.error(`Cache TTL error for key ${key}:`, error.message);
       return -1;
     }
   }
 
   async disconnect() {
-    if (this.client && this.isConnected) {
-      try {
-        await this.client.flushAll();
-        this.client = null;
-        this.isConnected = false;
-        logger.info('Cache client disconnected gracefully');
-      } catch (error) {
-        logger.error('Error disconnecting cache client:', error);
-      }
+    if (this.isConnected) {
+      await redisClient.disconnect();
+      this.client = null;
+      this.isConnected = false;
     }
   }
 
@@ -155,4 +123,4 @@ class MemoryCache {
   }
 }
 
-export default new MemoryCache();
+export default new RedisCache();

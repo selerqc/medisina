@@ -9,8 +9,8 @@ import notificationService from "#modules/notifications/notification.service.js"
 import { Engine } from 'json-rules-engine';
 import { allRules } from './health-analysis.rules.js';
 import { limitedAll } from '#utils/concurrency.js';
-// import cache from '#utils/cache.js';
-// import { CACHE_KEYS, CACHE_TTL } from '#utils/cacheKeys.js';
+import cache from '#utils/cache.js';
+import { CACHE_KEYS, CACHE_TTL } from '#utils/cacheKeys.js';
 import logger from '#logger/logger.js';
 import { uploadFileToCloudinary } from "#utils/cloudinary.js";
 class SchoolHealthExaminationService {
@@ -152,11 +152,7 @@ class SchoolHealthExaminationService {
       5
     );
 
-    //     try {
-    //       await cache.delPattern(CACHE_KEYS.SCHOOL_HEALTH_EXAM.PATTERN);
-    // } catch (error) {
-    //   logger.warn('Failed to invalidate school health exam cache', error);
-    // }
+    await cache.delPattern(CACHE_KEYS.SCHOOL_HEALTH_EXAM.PATTERN);
 
     return await card.save();
   }
@@ -224,22 +220,14 @@ class SchoolHealthExaminationService {
   }
 
   async getAllSchoolHealthRecordCount() {
-    //     const cacheKey = CACHE_KEYS.SCHOOL_HEALTH_EXAM.COUNT;
+    const cacheKey = CACHE_KEYS.SCHOOL_HEALTH_EXAM.COUNT;
 
-    //     try {
-    //       const cached = await cache.get(cacheKey);
-    //   if (cached !== null) return cached;
-    // } catch (error) {
-    //   logger.warn('Cache get failed for school health exam count', error);
-    // }
+    const cached = await cache.get(cacheKey);
+    if (cached !== null) return cached;
 
     const count = await SchoolHealthExamination.countDocuments({ isDeleted: false });
 
-    //     try {
-    //       await cache.set(cacheKey, count, CACHE_TTL.SHORT);
-    // } catch (error) {
-    //   logger.warn('Cache set failed for school health exam count', error);
-    // }
+    await cache.set(cacheKey, count, CACHE_TTL.SHORT);
 
     return count;
   }
@@ -276,14 +264,9 @@ class SchoolHealthExaminationService {
     card.lastModifiedBy = personnelId;
     card.updatedAt = new Date();
 
-    // Generate health assessment after updating
     await card.generateHealthAssessment(SchoolHealthDSSService);
 
-    //     try {
-    //       await cache.delPattern(CACHE_KEYS.SCHOOL_HEALTH_EXAM.PATTERN);
-    // } catch (error) {
-    //   logger.warn('Failed to invalidate school health exam cache', error);
-    // }
+    await cache.delPattern(CACHE_KEYS.SCHOOL_HEALTH_EXAM.PATTERN);
 
     return await card.save();
   }
@@ -314,11 +297,7 @@ class SchoolHealthExaminationService {
     card.lastModifiedBy = personnelId;
     card.updatedAt = new Date();
 
-    //     try {
-    //       await cache.delPattern(CACHE_KEYS.SCHOOL_HEALTH_EXAM.PATTERN);
-    // } catch (error) {
-    //   logger.warn('Failed to invalidate school health exam cache', error);
-    // }
+    await cache.delPattern(CACHE_KEYS.SCHOOL_HEALTH_EXAM.PATTERN);
 
     return await card.save();
   }
@@ -691,7 +670,7 @@ class SchoolHealthExaminationService {
       if (category === 'visionIssues' || category === 'hearingIssues') {
         const sampleReports = analysis.reports.slice(0, 3);
         sampleReports.forEach((report, idx) => {
-        
+
         });
       }
 
@@ -852,11 +831,7 @@ class SchoolHealthExaminationService {
       });
     }
 
-    //     try {
-    //       await cache.delPattern(CACHE_KEYS.SCHOOL_HEALTH_EXAM.PATTERN);
-    // } catch (error) {
-    //   logger.warn('Failed to invalidate school health exam cache', error);
-    // }
+    await cache.delPattern(CACHE_KEYS.SCHOOL_HEALTH_EXAM.PATTERN);
 
     return await card.save();
   }

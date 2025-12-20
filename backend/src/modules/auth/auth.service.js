@@ -10,8 +10,8 @@ import mongoose from 'mongoose';
 import logger from '#logger/logger.js';
 import fetch from "node-fetch";
 import personnelService from '#modules/personnel/personnel.service.js';
-// import cache from '#utils/cache.js';
-// import { CACHE_KEYS, CACHE_TTL } from '#utils/cacheKeys.js';
+import cache from '#utils/cache.js';
+import { CACHE_KEYS, CACHE_TTL } from '#utils/cacheKeys.js';
 class AuthService {
   async registerOrCreate(userData) {
     const session = await mongoose.startSession();
@@ -60,9 +60,7 @@ class AuthService {
 
       await session.commitTransaction();
 
-      // Invalidate user cache after successful registration
-      // await cache.delPattern(CACHE_KEYS.USER.PATTERN);
-      // logger.info('User cache invalidated after registration');
+      await cache.delPattern(CACHE_KEYS.USER.PATTERN);
 
       return newUser.toPersonnelJSON();
     } catch (error) {
@@ -173,17 +171,12 @@ class AuthService {
     }
   }
   async fetchAllUsers() {
-    // const cacheKey = CACHE_KEYS.USER.ALL;
+    const cacheKey = CACHE_KEYS.USER.ALL;
 
-    // try {
-    //   const cached = await cache.get(cacheKey);
-    //   if (cached) {
-    //     logger.info('Returning cached users');
-    //     return cached;
-    //   }
-    // } catch (error) {
-    //   logger.warn('Cache read error:', error);
-    // }
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
 
     const users = await User.find({ isDeleted: false, })
       .select('-password -resetPasswordToken -resetPasswordExpires')
@@ -195,7 +188,7 @@ class AuthService {
       createdAt: new Date(user.createdAt).toLocaleDateString("en-GB")
     }));
 
-    // await cache.set(cacheKey, formattedUsers, CACHE_TTL.SHORT);
+    await cache.set(cacheKey, formattedUsers, CACHE_TTL.SHORT);
     return formattedUsers;
   }
 
@@ -276,7 +269,7 @@ class AuthService {
       { new: true }
     ).select('-password -resetPasswordToken -resetPasswordExpires').lean();
 
-    // await cache.delPattern(CACHE_KEYS.USER.PATTERN);
+    await cache.delPattern(CACHE_KEYS.USER.PATTERN);
 
     return updatedUser;
   }
@@ -286,7 +279,7 @@ class AuthService {
       { $set: { status: "Approved" } }
     );
 
-    // await cache.delPattern(CACHE_KEYS.USER.PATTERN);
+    await cache.delPattern(CACHE_KEYS.USER.PATTERN);
 
     return result
   }

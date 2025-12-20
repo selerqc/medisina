@@ -1,13 +1,13 @@
 import express from 'express'
-import path from 'path';
-import { fileURLToPath } from 'url';
 import session from 'express-session';
+import { createClient } from 'redis';
+import { RedisStore } from 'connect-redis';
 import routeNotFound from '#middleware/routeNotFound.js'
 import Route from '#modules/index.js'
 import logger from '#logger/logger.js';
-import MongoStore from 'connect-mongo';
 import config from '#config/config.js';
-import passport from 'passport';
+import passport from 'passport'
+import cache from '#utils/cache.js';
 
 import { initCORS } from '#config/startup/cors.js'
 import { initializePassport } from '#config/passport.js';
@@ -16,8 +16,6 @@ import { initRateLimit } from '#config/startup/apilimiter.js';
 import { initProd } from '#config/startup/prod.js';
 import { healthCheck } from '#middleware/health.js';
 
-
-
 const app = express();
 
 initializePassport()
@@ -25,35 +23,43 @@ initCORS(app)
 initProd(app)
 initRateLimit(app)
 
+const redisClient = createClient({
+  url: config.redis.REDIS_URL,
+  password: config.redis.REDIS_PASSWORD || undefined,
+});
+
+redisClient.on('error', (err) => logger.error('Redis Session Error:', err.message));
+redisClient.on('connect', () => logger.info('Redis session store connecting...'));
+redisClient.on('ready', () => logger.info('Redis session store ready'));
+
+await redisClient.connect();
+
+const redisStore = new RedisStore({
+  client: redisClient,
+  prefix: 'medisina:sess:',
+});
 
 const sessionMiddleware = session({
+  store: redisStore,
   secret: config.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({
-    mongoUrl: config.mongoDb.MONGO_URI,
-    ttl: 30 * 60,
-    touchAfter: 24 * 3600
-  }),
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 1000 * 60 * 30,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     path: '/',
-    domain: process.env.NODE_ENV === 'production' ? undefined : undefined,
   },
   name: 'medisync.sid',
   rolling: true,
-  proxy: true, // Trust the reverse proxy
+  proxy: true,
 });
 
 app.use(sessionMiddleware);
 
-
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
 
 app.use(passport.initialize());
 app.use(passport.session());
@@ -61,13 +67,11 @@ app.use(logAuditTrails)
 
 app.get('/health', healthCheck);
 
-
 app.use('/api/v1', Route);
 
 app.get('/favicon.ico', (req, res) => {
   res.status(204).end();
 });
-
 
 app.use(routeNotFound)
 
@@ -101,5 +105,16 @@ app.use((err, req, res, next) => {
   return res.status(status).json(errorResponse);
 });
 
-export { sessionMiddleware };
+const initCache = async () => {
+  try {
+    await cache.connect();
+    logger.info('Data cache initialized');
+  } catch (error) {
+    logger.warn('Data cache initialization failed, continuing without cache:', error.message);
+  }
+};
+
+initCache();
+
+export { sessionMiddleware, redisClient };
 export default app

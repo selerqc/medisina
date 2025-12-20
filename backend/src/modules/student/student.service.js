@@ -11,6 +11,8 @@ import DentalTreatmentRecordModel from '#modules/dental-treatment-record/dental-
 import DentalRecordChartModel from '#modules/dental-record-chart/dental-record-chart.model.js';
 import HealthExaminationModel from '#modules/health-examination-record/health-examination.model.js';
 import ChiefComplaintModel from '#modules/chief-complaint/chief-complaint.model.js';
+import cache from '#utils/cache.js';
+import { CACHE_KEYS, CACHE_TTL } from '#utils/cacheKeys.js';
 
 class StudentService {
 
@@ -34,7 +36,6 @@ class StudentService {
     const student = await StudentModel.create(data);
     const updatedStudent = await StudentModel.findById(student._id);
 
-    // Create notification for attending personnel if assigned
     if (data.attendingPersonnel) {
       await notificationService.createNotification({
         recipientId: data.attendingPersonnel,
@@ -45,6 +46,8 @@ class StudentService {
         isActionRequired: false
       });
     }
+
+    await cache.delPattern(CACHE_KEYS.STUDENT.PATTERN);
 
     return updatedStudent;
   }
@@ -64,8 +67,8 @@ class StudentService {
     const query = {
       isDeleted: false,
       schoolName: { $in: schoolName }
-     };
-   
+    };
+
     const [students, total] = await Promise.all([
       StudentModel
         .find(query)
@@ -155,6 +158,8 @@ class StudentService {
       });
     }
 
+    await cache.delPattern(CACHE_KEYS.STUDENT.PATTERN);
+
     return updatedStudent;
   }
 
@@ -188,6 +193,8 @@ class StudentService {
         isActionRequired: false
       });
     }
+
+    await cache.delPattern(CACHE_KEYS.STUDENT.PATTERN);
 
     return {
       message: 'Student successfully deleted',
@@ -279,7 +286,14 @@ class StudentService {
     return students;
   }
   async getStudentCount() {
+    const cacheKey = CACHE_KEYS.STUDENT.COUNT;
+
+    const cached = await cache.get(cacheKey);
+    if (cached !== null) return cached;
+
     const count = await StudentModel.countDocuments({ isDeleted: false });
+
+    await cache.set(cacheKey, count, CACHE_TTL.SHORT);
     return count;
   }
 

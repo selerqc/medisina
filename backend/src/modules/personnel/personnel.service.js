@@ -15,6 +15,8 @@ import HealthExaminationModel from '#modules/health-examination-record/health-ex
 import ChiefComplaintModel from '#modules/chief-complaint/chief-complaint.model.js';
 import DentalTreatmentRecordModel from '#modules/dental-treatment-record/dental-treatment-record.model.js';
 import DentalRecordChartModel from '#modules/dental-record-chart/dental-record-chart.model.js';
+import cache from '#utils/cache.js';
+import { CACHE_KEYS, CACHE_TTL } from '#utils/cacheKeys.js';
 
 const userRoleCache = {
   nurseTeacherIds: null,
@@ -67,7 +69,14 @@ class PersonnelService {
     return personnel.toPersonnelJSON()
   }
   async getPersonnelCount() {
+    const cacheKey = CACHE_KEYS.PERSONNEL.COUNT;
+
+    const cached = await cache.get(cacheKey);
+    if (cached !== null) return cached;
+
     const count = await PersonnelModel.countDocuments({ isDeleted: false });
+
+    await cache.set(cacheKey, count, CACHE_TTL.SHORT);
     return count;
   }
 
@@ -172,7 +181,7 @@ class PersonnelService {
     const query = {
       isDeleted: false,
       schoolName: { $in: schoolName }
-   
+
     };
     const skip = (page - 1) * limit;
 

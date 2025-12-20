@@ -39,6 +39,10 @@ const config = {
     EMAIL_PASSWORD: process.env.EMAIL_PASS,
     EMAIL_USER: process.env.EMAIL_USER
   },
+  redis: {
+    REDIS_URL: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
+    REDIS_PASSWORD: process.env.REDIS_PASSWORD || '',
+  },
 }
 
 export default config;
