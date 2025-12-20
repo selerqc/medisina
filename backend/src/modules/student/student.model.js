@@ -15,6 +15,7 @@ const StudentSchema = new mongoose.Schema({
   birthplace: { type: String, trim: true },
   heightInCm: { type: Number, min: 0, max: 250 },
   weightInKg: { type: Number, min: 0, max: 300 },
+  nutritionalStatusBMI: { type: String, },
   address: { type: String, trim: true },
   telephoneNo: { type: String, trim: true },
   isDropOut: { type: Boolean, default: false },
