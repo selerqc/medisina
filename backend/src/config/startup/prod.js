@@ -25,6 +25,13 @@ export function initProd(app) {
       return compression.filter(req, res);
     }
   }));
-  app.use(helmet());
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        "frame-ancestors": ["'self'", "https://srv1202622.hstgr.cloud"],
+      },
+    },
+  }));
   app.disable('x-powered-by');
 }
