@@ -112,11 +112,10 @@ const login = Joi.object({
 });
 
 const forgotPassword = Joi.object({
-  email: Joi.string().email().trim().required().pattern(/@deped\.gov\.ph$/).messages({
+  email: Joi.string().email().trim().required().messages({
     "string.base": "Email must be a string.",
     "string.email": "Email must be a valid email address.",
     "string.empty": "Email is required.",
-    "string.pattern.base": "Email must be a valid @deped.gov.ph address.",
     "any.required": "Email is required.",
   }),
 });
