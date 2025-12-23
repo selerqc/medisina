@@ -10,6 +10,7 @@ import logger from '#logger/logger.js';
 import config from '#config/config.js';
 import passport from 'passport'
 import cache from '#utils/cache.js';
+import checkOrigin from '#middleware/checkOrigin.js';
 
 import { initCORS } from '#config/startup/cors.js'
 import { initializePassport } from '#config/passport.js';
@@ -82,7 +83,7 @@ app.get('/favicon.ico', (req, res) => {
 });
 
 app.use(routeNotFound)
-
+app.use(checkOrigin)
 app.use((err, req, res, next) => {
   logger.error('Unhandled error:', {
     meta: `path:${req.url} | method:${req.method} | error:${err.message}`
