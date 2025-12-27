@@ -31,7 +31,8 @@ export const createPrescriptionSchema = Joi.object({
   classification: Joi.string().trim().allow('').optional(),
   medications: Joi.array().items(medicationSchema).min(1).required(),
   notes: Joi.string().trim().allow('').optional(),
-  attendingExaminer: Joi.string().allow('').optional()
+  attendingExaminer: Joi.string().allow('').optional(),
+  signatureString: Joi.string().trim().allow('').optional(),
 });
 
 export const updatePrescriptionSchema = Joi.object({
