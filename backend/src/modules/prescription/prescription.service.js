@@ -14,7 +14,7 @@ import PersonnelHealthCard from '../personnel-health-card/personnel-health-card.
 class PrescriptionService {
 
   async createPrescription(prescriptionData, userId) {
-    const hardcodedDoctorInfo = {
+    const doctorInfo = {
       doctorName: 'RYAN CHRISTOPHER A. BUCCAT',
       doctorTitle: 'MD, MMPHA',
       doctorSpecialty: 'General Practitioner',
@@ -24,7 +24,7 @@ class PrescriptionService {
 
     const prescription = await Prescription.create({
       ...prescriptionData,
-      ...hardcodedDoctorInfo,
+      ...doctorInfo,
       prescribedBy: userId
     });
 
@@ -38,7 +38,7 @@ class PrescriptionService {
         recipientId: userId,
         title: NOTIFICATION_TITLE.PRESCRIPTION || 'PRESCRIPTION',
         message: `New prescription created for ${prescriptionData.patientName}`,
-        type: NOTIFICATION_TYPES.RECORD_CREATED,
+        type: NOTIFICATION_TYPES.NEW_RECORD,
         priority: PRIORITY_LEVELS.MEDIUM,
         isActionRequired: false
       });
@@ -51,7 +51,7 @@ class PrescriptionService {
   }
 
   async getPrescriptionById(prescriptionId) {
-    const cacheKey = `prescriptions:${prescriptionId}`;
+    const cacheKey = CACHE_KEYS.PRESCRIPTION.BY_ID(prescriptionId);
 
     try {
       const cached = await cache.get(cacheKey);

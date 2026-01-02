@@ -55,7 +55,6 @@ export const updatePrescription = asyncHandler(async (req, res) => {
     req.body,
     req.user._id
   );
-
   res.status(StatusCodes.OK).json({
     message: 'Prescription updated successfully',
     data: prescription
@@ -275,6 +274,22 @@ export const exportPrescriptionPdf = asyncHandler(async (req, res) => {
 
   const footerY = margin + 55;
   const signatureX = width - margin - 135;
+
+  if (prescription.signatureString) {
+    try {
+      const base64Data = prescription.signatureString.replace(/^data:image\/png;base64,/, '');
+      const signatureImageBytes = Buffer.from(base64Data, 'base64');
+      const signatureImage = await pdfDoc.embedPng(signatureImageBytes);
+      page.drawImage(signatureImage, {
+        x: signatureX,
+        y: footerY + 12,
+        width: 85,
+        height: 25,
+      });
+    } catch (error) {
+      console.error('Failed to embed signature image:', error);
+    }
+  }
 
   const doctorSignName = prescription.doctorName || 'Ryan christopher A. Buccat MD, MPHA';
   const licenseNumber = prescription.licenseNumber || '0169767';
