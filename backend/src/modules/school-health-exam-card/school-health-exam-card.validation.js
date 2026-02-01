@@ -92,10 +92,10 @@ const examinationFindingsSchema = Joi.object({
   deformitiesSpecify: Joi.string().trim().max(200).optional().allow(""),
   ironSupplementation: Joi.boolean().optional(),
   deworming: Joi.object({
-    firstRound: Joi.boolean().optional(),
-    firstRoundDate: Joi.date().optional(),
-    secondRound: Joi.boolean().optional(),
-    secondRoundDate: Joi.date().optional()
+    firstRound: Joi.boolean().optional().allow(""),
+    firstRoundDate: Joi.date().optional().allow(""),
+    secondRound: Joi.boolean().optional().allow(""),
+    secondRoundDate: Joi.date().optional().allow("")
   }).optional(),
   immunization: Joi.string().trim().max(200).optional().allow(""),
   sbfpBeneficiary: Joi.boolean().optional(),

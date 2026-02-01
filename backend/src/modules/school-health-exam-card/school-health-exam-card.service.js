@@ -1315,104 +1315,54 @@ class SchoolHealthExaminationService {
   }
 
   async _getSchoolRecordsForAnalysis(schoolId, userContext = null) {
+    const studentFields = "stdId lrn schoolName firstName lastName gradeLevel schoolId";
+
+    const executeQuery = (match = null) => {
+      const populateConfig = {
+        path: "student",
+        select: studentFields,
+        ...(match && { match })
+      };
+
+      return SchoolHealthExamination.find({ isDeleted: false })
+        .populate(populateConfig)
+        .lean()
+        .then(results => match ? results.filter(result => result.student) : results);
+    };
+
+    // No user context - unrestricted access
     if (!userContext) {
-      if (schoolId === 'all') {
-        return SchoolHealthExamination.find({ isDeleted: false })
-          .populate({
-            path: "student",
-            select: "stdId lrn schoolName firstName lastName gradeLevel schoolId",
-          })
-          .lean();
-      }
-
-      return SchoolHealthExamination.find({ isDeleted: false })
-        .populate({
-          path: "student",
-          match: { schoolId },
-          select: "stdId lrn schoolName firstName lastName gradeLevel schoolId",
-        })
-        .lean()
-        .then(results => results.filter(result => result.student));
+      return schoolId === 'all' ? executeQuery() : executeQuery({ schoolId });
     }
 
-    const associatedSchools = userContext.associatedSchools;
+    const { associatedSchools, schoolId: userSchoolIds } = userContext;
 
+    // District-level access - can see all schools
     if (associatedSchools === 'district') {
-      if (schoolId === 'all') {
-        return SchoolHealthExamination.find({ isDeleted: false })
-          .populate({
-            path: "student",
-            select: "stdId lrn schoolName firstName lastName gradeLevel schoolId",
-          })
-          .lean();
-      }
-
-      return SchoolHealthExamination.find({ isDeleted: false })
-        .populate({
-          path: "student",
-          match: { schoolId },
-          select: "stdId lrn schoolName firstName lastName gradeLevel schoolId",
-        })
-        .lean()
-        .then(results => results.filter(result => result.student));
+      return schoolId === 'all' ? executeQuery() : executeQuery({ schoolId });
     }
 
-    // Handle users with array of associated schools (single or multiple)
+    // Array of associated schools
     if (Array.isArray(associatedSchools) && associatedSchools.length > 0) {
       if (schoolId === 'all') {
-        return SchoolHealthExamination.find({ isDeleted: false })
-          .populate({
-            path: "student",
-            match: { schoolId: { $in: associatedSchools } },
-            select: "stdId lrn schoolName firstName lastName gradeLevel schoolId",
-          })
-          .lean()
-          .then(results => results.filter(result => result.student));
+        return executeQuery({ schoolId: { $in: associatedSchools } });
       }
-
-      if (!associatedSchools.includes(schoolId)) {
-        return [];
-      }
-
-      return SchoolHealthExamination.find({ isDeleted: false })
-        .populate({
-          path: "student",
-          match: { schoolId },
-          select: "stdId lrn schoolName firstName lastName gradeLevel schoolId",
-        })
-        .lean()
-        .then(results => results.filter(result => result.student));
+      return associatedSchools.includes(schoolId) ? executeQuery({ schoolId }) : [];
     }
 
-    if (userContext.schoolId && Array.isArray(userContext.schoolId) && userContext.schoolId.length > 0) {
-      const userSchoolIds = userContext.schoolId;
-
+    // Fallback to userContext.schoolId array
+    if (Array.isArray(userSchoolIds) && userSchoolIds.length > 0) {
       if (schoolId === 'all') {
-        return SchoolHealthExamination.find({ isDeleted: false })
-          .populate({
-            path: "student",
-            match: { schoolId: { $in: userSchoolIds } },
-            select: "stdId lrn schoolName firstName lastName gradeLevel schoolId",
-          })
-          .lean()
-          .then(results => results.filter(result => result.student));
+        return executeQuery({ schoolId: { $in: userSchoolIds } });
       }
-
       if (userSchoolIds.includes(schoolId)) {
-        return SchoolHealthExamination.find({ isDeleted: false })
-          .populate({
-            path: "student",
-            match: { schoolId },
-            select: "stdId lrn schoolName firstName lastName gradeLevel schoolId",
-          })
-          .lean()
-          .then(results => results.filter(result => result.student));
+        return executeQuery({ schoolId });
       }
     }
 
     console.warn('No school access found for user:', {
       associatedSchools,
-      schoolId: userContext.schoolId,
+      schoolId: userSchoolIds,
       requestedSchoolId: schoolId
     });
 
